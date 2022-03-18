@@ -78,19 +78,11 @@ TLS=$(ETC)/tls
 #space separated string array ->
 $(eval $(call defw,NAMESPACES,keycloak-test))
 $(eval $(call defw,DEFAULT_NAMESPACE,$(shell echo $(NAMESPACES) | awk '{print $$1}')))
-$(eval $(call defw,DOMAINS,"localhost.com api.localhost.com cache.localhost.com login.localhost.com www.localhost.com"))
+$(eval $(call defw,DOMAINS,"www.keycloak.lan"))
 $(eval $(call defw,CLUSTER_NAME,$(shell basename $(MFILECWD))))
 $(eval $(call defw,IP_ADDRESS,$(shell hostname -I | awk '{print $$1}')))
-$(eval $(call defw,KUBECTL,kubectl))
-$(eval $(call defw,OPENSSL,openssl))
-$(eval $(call defw,CA_TLS_FILE,$(TLS)/localhost-ca.pem))
-$(eval $(call defw,CA_TLS_KEY,$(TLS)/localhost-ca-key.pem))
-$(eval $(call defw,TLS_FILE,$(TLS)/server.pem))
-$(eval $(call defw,TLS_KEY,$(TLS)/server-key.pem))
-$(eval $(call defw,TLS_CSR,$(TLS)/server.csr))
 
 MAIN_DOMAIN=$(shell echo $(DOMAINS) | awk '{print $$1}')
-SAN=$(shell echo $(DOMAINS) | sed 's/[^ ]* */DNS:&/g' | sed 's/\s\+/,/g') 
 
 # === END USER OPTIONS ===
 
@@ -116,41 +108,24 @@ dns/remove: ##@dns Delete dns entries
 
 ### CERTS
 
-.PHONY: tls/create-ca
-tls/create-ca: ##@tls Create self sign CA certs
-	@echo "Creating key"
-	$(OPENSSL) genrsa -out $(CA_TLS_KEY) 4096
-	$(OPENSSL) req -x509 -new -nodes -key $(CA_TLS_KEY) -sha256 -days 1024 -subj "/C=UK/ST=London/O=Issuing authority/OU=IT management" -out $(CA_TLS_FILE)
-	@echo "Created at: $(CA_TLS_FILE)"
-
 .PHONY: tls/create-cert
-tls/create-cert: tls/create-ca ##@tls Create self sign certs for local machine
+tls/create-cert:  ##@tls Create self sign certs for local machine
 	@echo "Creating self signed certificate"
-	$(OPENSSL) req -newkey rsa:2048 -nodes -keyout $(TLS_KEY) -subj "/C=UK/ST=London/L=London/O=Development/OU=IT/CN=$(MAIN_DOMAIN)" -out $(TLS_CSR)
-	$(OPENSSL) x509 -req -extfile <(printf "subjectAltName=$(SAN),DNS:localhost,DNS:127.0.0.1") -days 365 -signkey $(CA_TLS_KEY) -in $(TLS_CSR) -out $(TLS_FILE)
+	(cd $(TLS) && ./self-signed-cert.sh)
 
-.PHONY: tls/show-ca
-tls/show-ca: ##@tls Show cert details
-	@echo "Creating self signed certificate"
-	$(OPENSSL) x509 -in $(CA_TLS_FILE) -text -noout
-
-.PHONY: tls/show-cert
-tls/show-cert: ##@tls Show cert details
-	@echo "Creating self signed certificate"
-	$(OPENSSL) x509 -in $(TLS_FILE) -text -noout
 
 .PHONY: tls/trust-cert
 tls/trust-cert: ##@tls Trust self signed cert by local browser
 	@echo "Import self signed cert into user's truststore"
 	@[ -d ~/.pki/nssdb ] || mkdir -p ~/.pki/nssdb
-	@certutil -d sql:$$HOME/.pki/nssdb -A -n '$(MAIN_DOMAIN) cert authority' -i $(CA_TLS_FILE) -t TCP,TCP,TCP
-	@certutil -d sql:$$HOME/.pki/nssdb -A -n '$(MAIN_DOMAIN)' -i $(TLS_FILE) -t P,P,P
+	@certutil -d sql:$$HOME/.pki/nssdb -A -n '$(MAIN_DOMAIN) cert authority' -i $(TLS)/tls-ca/keycloak.lan_ca.crt -t TCP,TCP,TCP
+	@certutil -d sql:$$HOME/.pki/nssdb -A -n '$(MAIN_DOMAIN)' -i $(TLS)/tls-ca/keycloak.lan.crt -t P,P,P
 	@echo "Import successful..."
 
 ### MISC
 
 .PHONY: init
-init: k8s/create-namespaces k8s/certman/install k8s/certman/secret k8s/certman/issuer k8s/certman/install-cert sampledata dns/insert## Initialize the environment by creating cert manager
+init: tls/create-cert tls/trust-cert dns/insert## Initialize the environment by creating cert manager
 	@echo "Init completed"
 
 .PHONY: synctime

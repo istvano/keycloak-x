@@ -21,10 +21,13 @@ services:
       - KC_DB_PASSWORD=${POSTGRES_NON_ROOT_PASSWORD}
       - KEYCLOAK_ADMIN
       - KEYCLOAK_ADMIN_PASSWORD
+      - KC_HTTP_ENABLED
       - KC_HOSTNAME
       - KC_HOSTNAME_STRICT
-    # volumes:
-    #   - ./keycloakx:/keycloakx:z
+      - KC_HTTPS_CERTIFICATE_FILE
+      - KC_HTTPS_CERTIFICATE_KEY_FILE
+    volumes:
+      - ./etc/tls/tls-ca:/etc/ssl/certs/keycloak
     ports:
       - "8080:8080"
       - "8443:8443"
