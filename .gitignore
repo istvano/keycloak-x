@@ -1,4 +1,4 @@
-etc/*
+etc/tls/*
 
 # Compiled class file
 *.class

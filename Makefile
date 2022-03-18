@@ -73,6 +73,7 @@ help:: ##@Other Show this help.
 # === BEGIN USER OPTIONS ===
 MFILECWD = $(shell pwd)
 ETC=$(MFILECWD)/etc
+TLS=$(ETC)/tls
 
 #space separated string array ->
 $(eval $(call defw,NAMESPACES,keycloak-test))
@@ -82,11 +83,11 @@ $(eval $(call defw,CLUSTER_NAME,$(shell basename $(MFILECWD))))
 $(eval $(call defw,IP_ADDRESS,$(shell hostname -I | awk '{print $$1}')))
 $(eval $(call defw,KUBECTL,kubectl))
 $(eval $(call defw,OPENSSL,openssl))
-$(eval $(call defw,CA_TLS_FILE,$(ETC)/localhost-ca.pem))
-$(eval $(call defw,CA_TLS_KEY,$(ETC)/localhost-ca-key.pem))
-$(eval $(call defw,TLS_FILE,$(ETC)/server.pem))
-$(eval $(call defw,TLS_KEY,$(ETC)/server-key.pem))
-$(eval $(call defw,TLS_CSR,$(ETC)/server.csr))
+$(eval $(call defw,CA_TLS_FILE,$(TLS)/localhost-ca.pem))
+$(eval $(call defw,CA_TLS_KEY,$(TLS)/localhost-ca-key.pem))
+$(eval $(call defw,TLS_FILE,$(TLS)/server.pem))
+$(eval $(call defw,TLS_KEY,$(TLS)/server-key.pem))
+$(eval $(call defw,TLS_CSR,$(TLS)/server.csr))
 
 MAIN_DOMAIN=$(shell echo $(DOMAINS) | awk '{print $$1}')
 SAN=$(shell echo $(DOMAINS) | sed 's/[^ ]* */DNS:&/g' | sed 's/\s\+/,/g') 
