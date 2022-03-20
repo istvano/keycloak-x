@@ -71,16 +71,22 @@ help:: ##@Other Show this help.
 	@perl -e '$(HELP_FUN)' $(MAKEFILE_LIST)
 
 # === BEGIN USER OPTIONS ===
+include .env
+
 MFILECWD = $(shell pwd)
 ETC=$(MFILECWD)/etc
 TLS=$(ETC)/tls
 
 #space separated string array ->
+$(eval $(call defw,KEYCLOAK-MIGRATE,v4.8.0-17.0.0))
 $(eval $(call defw,NAMESPACES,keycloak-test))
+$(eval $(call defw,ENV,$(ENV)))
 $(eval $(call defw,DEFAULT_NAMESPACE,$(shell echo $(NAMESPACES) | awk '{print $$1}')))
 $(eval $(call defw,DOMAINS,"www.keycloak.lan"))
 $(eval $(call defw,CLUSTER_NAME,$(shell basename $(MFILECWD))))
 $(eval $(call defw,IP_ADDRESS,$(shell hostname -I | awk '{print $$1}')))
+$(eval $(call defw,DOCKER,docker))
+$(eval $(call defw,COMPOSE,docker-compose))
 
 MAIN_DOMAIN=$(shell echo $(DOMAINS) | awk '{print $$1}')
 
@@ -121,6 +127,30 @@ tls/trust-cert: ##@tls Trust self signed cert by local browser
 	@certutil -d sql:$$HOME/.pki/nssdb -A -n '$(MAIN_DOMAIN) cert authority' -i $(TLS)/tls-ca/keycloak.lan_ca.crt -t TCP,TCP,TCP
 	@certutil -d sql:$$HOME/.pki/nssdb -A -n '$(MAIN_DOMAIN)' -i $(TLS)/tls-ca/keycloak.lan.crt -t P,P,P
 	@echo "Import successful..."
+
+### KEYCLOAK
+
+.PHONY: keycomposecloak/up
+compose/up:  ##@Compose up
+	$(COMPOSE) --project-name=$(ENV) up
+
+.PHONY: compose/ps
+compose/ps:  ##@Compose show processes
+	$(COMPOSE) --project-name=$(ENV) ps
+
+.PHONY: keycloak/migrate
+keycloak/migrate:  ##@keycloak Run migrations
+	$(DOCKER) run --network $(ENV)_sso \
+	-e KEYCLOAK_URL=https://sso:8443/ \
+	-e KEYCLOAK_USER=$(KEYCLOAK_ADMIN) \
+	-e KEYCLOAK_PASSWORD=$(KEYCLOAK_ADMIN_PASSWORD) \
+	-e KEYCLOAK_SSLVERIFY=false \
+	-e WAIT_TIME_IN_SECONDS=120 \
+	-e SPRING_PROFILES_INCLUDE=debug \
+	-e IMPORT_PATH=/config \
+	-e IMPORT_FORCE=false \
+	--mount type=bind,source="$$(pwd)"/etc/conf/keycloak,target=/config \
+	adorsys/keycloak-config-cli:$(KEYCLOAK-MIGRATE)
 
 ### MISC
 

@@ -1,0 +1,59 @@
+{
+  "enabled": true,
+  "realm": "quickstart",
+  "clients": [
+    {
+      "clientId": "test-public-client",
+      "name": "test-public-client",
+      "description": "Test Client",
+      "enabled": true,
+      "bearerOnly": false,
+      "consentRequired": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "publicClient": true,
+      "redirectUris": [
+        "*"
+      ],
+      "webOrigins": [
+        "*"
+      ]
+    },
+    {
+      "clientId": "test-confidential-client",
+      "name": "test-confidential-client",
+      "description": "Confidential Test Client",
+      "enabled": true,
+      "bearerOnly": false,
+      "consentRequired": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "secret",
+      "redirectUris": [
+        "*"
+      ],
+      "webOrigins": [
+        "*"
+      ]
+    },
+    {
+      "clientId": "test-bearer-client",
+      "name": "test-bearer-client",
+      "description": "Bearer Only Test Client",
+      "enabled": true,
+      "bearerOnly": true,
+      "consentRequired": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "publicClient": false
+    }
+  ]
+}

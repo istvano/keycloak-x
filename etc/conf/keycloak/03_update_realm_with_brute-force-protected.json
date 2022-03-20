@@ -1,0 +1,12 @@
+{
+  "enabled": true,
+  "realm": "quickstart",
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "maxFailureWaitSeconds": 900,
+  "minimumQuickLoginWaitSeconds": 60,
+  "waitIncrementSeconds": 300,
+  "quickLoginCheckMilliSeconds": 1000,
+  "maxDeltaTimeSeconds": 7200,
+  "failureFactor": 5
+}

@@ -1,0 +1,23 @@
+{
+  "enabled": true,
+  "realm": "quickstart",
+  "defaultRoles": [
+    "user"
+  ],
+  "roles": {
+    "realm": [
+      {
+        "name": "user",
+        "description": "user",
+        "composite": false,
+        "clientRole": false
+      },
+      {
+        "name": "admin",
+        "description": "admin",
+        "composite": false,
+        "clientRole": false
+      }
+    ]
+  }
+}
