@@ -186,7 +186,8 @@ run: ##@dev Start docker container
 		--env-file=./.env \
 		--name="$(APP)" \
 		--mount type=bind,source=$(MFILECWD)/etc/tls/tls-ca,target=/etc/ssl/certs/keycloak \
-		-e KC_DB=dev-mem \
+		--mount type=bind,source=$(MFILECWD)/etc/tmp,target=/opt/keycloak/data/h2 \
+		-e KC_DB=dev-file \
 		-p 8080:8080 \
 		-p $(TLS_PORT):8443 \
 		-p 8787:8787 \

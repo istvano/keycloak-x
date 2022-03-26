@@ -1,5 +1,5 @@
 etc/tls/*
-
+etc/tmp/*
 # Compiled class file
 *.class
 
