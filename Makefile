@@ -71,18 +71,22 @@ help:: ##@Other Show this help.
 	@perl -e '$(HELP_FUN)' $(MAKEFILE_LIST)
 
 # === BEGIN USER OPTIONS ===
-include .env
+# import env file
+# You can change the default config with `make env="youfile.env" build`
+env ?= .env
+include $(env)
+export $(shell sed 's/=.*//' $(env))
 
 MFILECWD = $(shell pwd)
 ETC=$(MFILECWD)/etc
 TLS=$(ETC)/tls
 
 #space separated string array ->
-$(eval $(call defw,KEYCLOAK-MIGRATE,v4.8.0-17.0.0))
 $(eval $(call defw,NAMESPACES,keycloak-test))
-$(eval $(call defw,ENV,$(ENV)))
 $(eval $(call defw,DEFAULT_NAMESPACE,$(shell echo $(NAMESPACES) | awk '{print $$1}')))
+$(eval $(call defw,ENV,$(ENV)))
 $(eval $(call defw,DOMAINS,"www.keycloak.lan"))
+$(eval $(call defw,TLS_PORT,8443))
 $(eval $(call defw,CLUSTER_NAME,$(shell basename $(MFILECWD))))
 $(eval $(call defw,IP_ADDRESS,$(shell hostname -I | awk '{print $$1}')))
 $(eval $(call defw,DOCKER,docker))
@@ -128,20 +132,71 @@ tls/trust-cert: ##@tls Trust self signed cert by local browser
 	@certutil -d sql:$$HOME/.pki/nssdb -A -n '$(MAIN_DOMAIN)' -i $(TLS)/tls-ca/keycloak.lan.crt -t P,P,P
 	@echo "Import successful..."
 
-### KEYCLOAK
+### COMPOSE
 
-.PHONY: keycomposecloak/up
+.PHONY: compose/up
 compose/up:  ##@Compose up
-	$(COMPOSE) --project-name=$(ENV) up
+	$(COMPOSE) --project-name=$(PROJECT) up
 
 .PHONY: compose/ps
 compose/ps:  ##@Compose show processes
-	$(COMPOSE) --project-name=$(ENV) ps
+	$(COMPOSE) --project-name=$(PROJECT) ps
 
-.PHONY: keycloak/migrate
-keycloak/migrate:  ##@keycloak Run migrations
-	$(DOCKER) run --network $(ENV)_sso \
-	-e KEYCLOAK_URL=https://sso:8443/ \
+### DOCKER
+.PHONY: build
+build:  ##@Docker build docker image
+	$(DOCKER) build . -t $(APP)
+
+.PHONY: build-nc
+build-nc:  ##@Docker build docker image without using cache
+	$(DOCKER) build . -t $(APP)
+
+.PHONY: tag
+tag: tag-latest tag-version ##@Docker Generate container tags for the `{version}` ans `latest` tags
+
+.PHONY: tag-latest
+tag-latest:
+	@echo 'creating tag :latest'
+	$(DOCKER) tag $(APP) $(DOCKER_REPO)/$(APP):latest
+
+.PHONY: tag-version
+tag-version:
+	@echo 'creating tag $(VERSION)'
+	$(DOCKER) tag $(APP) $(DOCKER_REPO)/$(APP):$(VERSION)
+
+.PHONY: release
+release: build-nc publish ##@Docker Build without cache and tag the docker image
+
+.PHONY: publish
+publish: push-tag push-latest
+
+.PHONY: push-latest
+push-latest:
+	$(DOCKER) push $(DOCKER_REPO)/$(APP):latest
+
+.PHONY: push-tag
+push-tag:
+	$(DOCKER) push $(DOCKER_REPO)/$(APP):$(VERSION)
+
+### DEVELOPMENT
+
+.PHONY: run
+run: ##@dev Start docker container
+	$(DOCKER) run -i -t --rm \
+		--env-file=./.env \
+		--name="$(APP)" \
+		--mount type=bind,source=$(MFILECWD)/etc/tls/tls-ca,target=/etc/ssl/certs/keycloak \
+		-e KC_DB=dev-mem \
+		-p 8080:8080 \
+		-p $(TLS_PORT):8443 \
+		-p 8787:8787 \
+		$(BASE-IMAGE) \
+		start-dev
+
+.PHONY: kc/migrate
+kc/migrate: ##@dev Run migrations
+	$(DOCKER) run --network=host \
+	-e KEYCLOAK_URL=https://$(MAIN_DOMAIN):$(TLS_PORT)/ \
 	-e KEYCLOAK_USER=$(KEYCLOAK_ADMIN) \
 	-e KEYCLOAK_PASSWORD=$(KEYCLOAK_ADMIN_PASSWORD) \
 	-e KEYCLOAK_SSLVERIFY=false \
@@ -151,6 +206,7 @@ keycloak/migrate:  ##@keycloak Run migrations
 	-e IMPORT_FORCE=false \
 	--mount type=bind,source="$$(pwd)"/etc/conf/keycloak,target=/config \
 	adorsys/keycloak-config-cli:$(KEYCLOAK-MIGRATE)
+
 
 ### MISC
 
@@ -167,7 +223,8 @@ synctime: ##@misc Sync VM time
 .PHONY: versions
 versions: ##@misc Print the "imporant" tools versions out for easier debugging.
 	@echo "=== BEGIN Version Info ==="
-	@echo "Project name: ${CLUSTER_NAME}"
+	@echo "Project name: ${PROJECT}"
+	@echo "version: ${VERSION}"
 	@echo "Repo state: $$(git rev-parse --verify HEAD) (dirty? $$(if git diff --quiet; then echo 'NO'; else echo 'YES'; fi))"
 	@echo "make: $$(command -v make)"
 	@echo "kubectl: $$(command -v kubectl)"
