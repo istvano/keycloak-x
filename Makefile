@@ -186,7 +186,7 @@ run: ##@dev Start docker container
 		--env-file=./.env \
 		--name="$(APP)" \
 		--mount type=bind,source=$(MFILECWD)/etc/tls/tls-ca,target=/etc/ssl/certs/keycloak \
-		--mount type=bind,source=$(MFILECWD)/etc/tmp,target=/opt/keycloak/data/h2 \
+		-v $(MFILECWD)/etc/tmp:/opt/keycloak/data \
 		-e KC_DB=dev-file \
 		-p 8080:8080 \
 		-p $(TLS_PORT):8443 \
@@ -208,6 +208,86 @@ kc/migrate: ##@dev Run migrations
 	--mount type=bind,source="$$(pwd)"/etc/conf/keycloak,target=/config \
 	adorsys/keycloak-config-cli:$(KEYCLOAK-MIGRATE)
 
+### DOCUMENTATION
+.PHONY: website/install
+website/install:: ##@docs Install dependencies
+	@echo "Installing dependencies"
+	(cd website && \
+		$(DOCKER) run --rm -it \
+			--mount type=bind,source="$$(pwd)",target=/usr/local/src \
+			--workdir=/usr/local/src \
+			$(DOCS-DOCKER-IMG) \
+			yarn install)
+
+.PHONY: website/reset
+website/reset:: ##@docs Delete all dependencies
+	@echo "Delete node_modules folder"
+	(cd website && \
+		$(DOCKER) run --rm -it \
+			--mount type=bind,source="$$(pwd)",target=/usr/local/src \
+			--workdir=/usr/local/src \
+			-u $(id -u ${USER}):$(id -g ${USER}) \
+			$(DOCS-DOCKER-IMG) \
+			rm /usr/local/src/node_modules -rf)
+
+.PHONY: website/build
+website/build:: ##@docs Create Production images
+	(cd website && \
+		$(DOCKER) run --rm -it \
+			--mount type=bind,source="$$(pwd)",target=/usr/local/src \
+			--workdir=/usr/local/src \
+			$(DOCS-DOCKER-IMG) \
+			yarn run build)
+
+.PHONY: website/start
+website/start:: ##@docs Start in Dev mode
+	(cd website && \
+		$(DOCKER) run --rm -it \
+			-p 3000:3000 \
+			--mount type=bind,source="$$(pwd)",target=/usr/local/src \
+			--workdir=/usr/local/src \
+			$(DOCS-DOCKER-IMG) \
+			yarn run start)
+
+.PHONY: website/run
+website/run:: ##@docs List start commands and allows you to run one
+	(cd website && \
+		$(DOCKER) run --rm -it \
+			-p 3000:3000 \
+			--mount type=bind,source="$$(pwd)",target=/usr/local/src \
+			--workdir=/usr/local/src \
+			$(DOCS-DOCKER-IMG) \
+			yarn run)
+
+.PHONY: website/npm/list
+website/npm/list:: ##@docs List packages
+	(cd website && \
+		$(DOCKER) run --rm -it \
+			-p 3000:3000 \
+			--mount type=bind,source="$$(pwd)",target=/usr/local/src \
+			--workdir=/usr/local/src \
+			$(DOCS-DOCKER-IMG) \
+			npm ls --depth 0)
+
+.PHONY: website/yarn/outdated
+website/yarn/outdated:: ##@docs Lists the outdated packages
+	(cd website && \
+		$(DOCKER) run --rm -it \
+			-p 3000:3000 \
+			--mount type=bind,source="$$(pwd)",target=/usr/local/src \
+			--workdir=/usr/local/src \
+			$(DOCS-DOCKER-IMG) \
+			yarn outdated)
+
+.PHONY: website/cli
+website/cli:: ##@docs Start a cli in the node container
+	(cd website && \
+		$(DOCKER) run --rm -it \
+			-p 3000:3000 \
+			--mount type=bind,source="$$(pwd)",target=/usr/local/src \
+			--workdir=/usr/local/src \
+			$(DOCS-DOCKER-IMG) \
+			bash)
 
 ### MISC
 
