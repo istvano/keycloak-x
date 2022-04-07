@@ -178,15 +178,28 @@ push-latest:
 push-tag:
 	$(DOCKER) push $(DOCKER_REPO)/$(APP):$(VERSION)
 
+### THEMING
+.PHONY: theme/build
+theme/build: ##@dev Start docker container
+	$(DOCKER) run -it --rm \
+		--env-file=./.env \
+		--mount type=bind,source=$(MFILECWD)/themes,target=/usr/local/src \
+		--mount type=bind,source=$(MFILECWD)/etc/tmp/m2,target=/root/.m2 \
+		--workdir="/usr/local/src" \
+		$(MAVEN-IMAGE) \
+		mvn package
+
 ### DEVELOPMENT
 
 .PHONY: run
 run: ##@dev Start docker container
 	$(DOCKER) run -i -t --rm \
 		--env-file=./.env \
+		--network $(ENV)_sso \
 		--name="$(APP)" \
 		--mount type=bind,source=$(MFILECWD)/etc/tls/tls-ca,target=/etc/ssl/certs/keycloak \
-		--mount type=bind,source=$(MFILECWD)/etc/tmp,target=/opt/keycloak/data/h2 \
+		--mount type=bind,source=$(MFILECWD)/etc/data,target=/opt/keycloak/data \
+		--mount type=bind,source=$(MFILECWD)/themes/src/main/resources/themes,target=/opt/keycloak/themes \
 		-e KC_DB=dev-file \
 		-p 8080:8080 \
 		-p $(TLS_PORT):8443 \
@@ -196,8 +209,9 @@ run: ##@dev Start docker container
 
 .PHONY: kc/migrate
 kc/migrate: ##@dev Run migrations
-	$(DOCKER) run --network=host \
-	-e KEYCLOAK_URL=https://$(MAIN_DOMAIN):$(TLS_PORT)/ \
+	$(DOCKER) run \
+	--network $(ENV)_sso \
+	-e KEYCLOAK_URL=https://keycloak:8443/ \
 	-e KEYCLOAK_USER=$(KEYCLOAK_ADMIN) \
 	-e KEYCLOAK_PASSWORD=$(KEYCLOAK_ADMIN_PASSWORD) \
 	-e KEYCLOAK_SSLVERIFY=false \

@@ -1,5 +1,7 @@
 etc/tls/*
 etc/tmp/*
+etc/data/*
+themes/target/*
 # Compiled class file
 *.class
 
