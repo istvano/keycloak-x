@@ -11,6 +11,8 @@ etc/tmp/*
 
 # Mobile Tools for Java (J2ME)
 .mtj.tmp/
+website/.docusaurus
+website/node_modules
 
 # Package Files #
 *.jar
