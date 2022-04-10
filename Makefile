@@ -168,10 +168,15 @@ tls/create-cert:  ##@tls Create self sign certs for local machine
 .PHONY: tls/trust-cert
 tls/trust-cert: ##@tls Trust self signed cert by local browser
 	@echo "Import self signed cert into user's truststore"
+ifeq ($(UNAME_S),Darwin)
+	sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain $(TLS)/tls-ca/keycloak.lan_ca.crt
+else
 	@[ -d ~/.pki/nssdb ] || mkdir -p ~/.pki/nssdb
 	@certutil -d sql:$$HOME/.pki/nssdb -A -n '$(MAIN_DOMAIN) cert authority' -i $(TLS)/tls-ca/keycloak.lan_ca.crt -t TCP,TCP,TCP
 	@certutil -d sql:$$HOME/.pki/nssdb -A -n '$(MAIN_DOMAIN)' -i $(TLS)/tls-ca/keycloak.lan.crt -t P,P,P
+endif
 	@echo "Import successful..."
+
 
 ### COMPOSE
 
