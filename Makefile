@@ -143,6 +143,14 @@ compose/ps:  ##@Compose show processes
 	$(COMPOSE) --project-name=$(PROJECT) ps
 
 ### DOCKER
+.PHONY: network/create
+network/create: ##@Docker create network
+	$(DOCKER) network inspect $(ENV)_sso || $(DOCKER) network create $(ENV)_sso
+
+.PHONY: network/delete
+network/delete: ##@Docker create network
+	$(DOCKER) network inspect $(ENV)_sso && $(DOCKER) network rm $(ENV)_sso
+
 .PHONY: build
 build:  ##@Docker build docker image
 	$(DOCKER) build . -t $(APP)
@@ -226,7 +234,7 @@ kc/migrate: ##@dev Run migrations
 ### MISC
 
 .PHONY: init
-init: tls/create-cert tls/trust-cert dns/insert## Initialize the environment by creating cert manager
+init: tls/create-cert network/create tls/trust-cert dns/insert## Initialize the environment by creating cert manager
 	@echo "Init completed"
 
 .PHONY: synctime
