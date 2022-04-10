@@ -205,7 +205,7 @@ run: ##@dev Start docker container
 		-p $(TLS_PORT):8443 \
 		-p 8787:8787 \
 		$(BASE-IMAGE) \
-		start-dev
+		start-dev --features=preview
 
 .PHONY: kc/migrate
 kc/migrate: ##@dev Run migrations
