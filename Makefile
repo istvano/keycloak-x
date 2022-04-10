@@ -140,11 +140,11 @@ endif
 ### DNS
 
 .PHONY: dns/create
-dns/insert: ##@dns Create dns
+dns/insert: dns/remove ##@dns Create dns
 	@echo "Creating HOST DNS entries for the project ..."
 	@for v in $(DOMAINS) ; do \
 		echo $$v; \
-		sudo sh -c "sed -zi \"/$$v/!s/$$/\n$(IP_ADDRESS)	$$v/\" /etc/hosts "; \
+		sudo -- sh -c -e "echo '$(IP_ADDRESS)	$$v' >> /etc/hosts"; \
 	done
 	@echo "Completed..."
 
@@ -153,7 +153,7 @@ dns/remove: ##@dns Delete dns entries
 	@echo "Removing HOST DNS entries ..."
 	@for v in $(DOMAINS) ; do \
 		echo $$v; \
-		sudo sh -c "sed -i \"/$(IP_ADDRESS)	$$v/d\" /etc/hosts"; \
+		sudo -- sh -c "sed -i.bak \"/$(IP_ADDRESS)	$$v/d\" /etc/hosts && rm /etc/hosts.bak"; \
 	done
 	@echo "Completed..."
 
