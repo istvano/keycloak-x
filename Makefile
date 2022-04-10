@@ -12,6 +12,38 @@ RESET     := $(shell tput -Txterm sgr0)
 SMUL      := $(shell tput smul)
 RMUL      := $(shell tput rmul)
 
+ifeq ($(OS),Windows_NT)
+    CCFLAGS += -D WIN32
+    ifeq ($(PROCESSOR_ARCHITEW6432),AMD64)
+        CCFLAGS += -D AMD64
+    else
+        ifeq ($(PROCESSOR_ARCHITECTURE),AMD64)
+            CCFLAGS += -D AMD64
+        endif
+        ifeq ($(PROCESSOR_ARCHITECTURE),x86)
+            CCFLAGS += -D IA32
+        endif
+    endif
+else
+    UNAME_S := $(shell uname -s)
+    ifeq ($(UNAME_S),Linux)
+        CCFLAGS += -D LINUX
+    endif
+    ifeq ($(UNAME_S),Darwin)
+        CCFLAGS += -D OSX
+    endif
+    UNAME_P := $(shell uname -p)
+    ifeq ($(UNAME_P),x86_64)
+        CCFLAGS += -D AMD64
+    endif
+    ifneq ($(filter %86,$(UNAME_P)),)
+        CCFLAGS += -D IA32
+    endif
+    ifneq ($(filter arm%,$(UNAME_P)),)
+        CCFLAGS += -D ARM
+    endif
+endif
+
 # Variable wrapper
 define defw
 	custom_vars += $(1)
@@ -81,6 +113,7 @@ MFILECWD = $(shell pwd)
 ETC=$(MFILECWD)/etc
 TLS=$(ETC)/tls
 
+
 #space separated string array ->
 $(eval $(call defw,NAMESPACES,keycloak-test))
 $(eval $(call defw,DEFAULT_NAMESPACE,$(shell echo $(NAMESPACES) | awk '{print $$1}')))
@@ -88,12 +121,20 @@ $(eval $(call defw,ENV,$(ENV)))
 $(eval $(call defw,DOMAINS,"www.keycloak.lan"))
 $(eval $(call defw,TLS_PORT,8443))
 $(eval $(call defw,CLUSTER_NAME,$(shell basename $(MFILECWD))))
-$(eval $(call defw,IP_ADDRESS,$(shell hostname -I | awk '{print $$1}')))
+$(eval $(call defw,IP_ADDRESS,$(IP_ADDRESS)))
 $(eval $(call defw,DOCKER,docker))
 $(eval $(call defw,COMPOSE,docker-compose))
+$(eval $(call defw,UNAME,$(UNAME_S)-$(UNAME_P)))
 
 MAIN_DOMAIN=$(shell echo $(DOMAINS) | awk '{print $$1}')
-
+ifeq ($(UNAME_S),Darwin)
+	IP_ADDRESS=$(shell ipconfig getifaddr en0 | awk '{print $$1}')
+else
+	IP_ADDRESS=$(shell hostname -I | awk '{print $$1}')
+endif
+ifeq ($(IP_ADDRESS),)
+	IP_ADDRESS=127.0.0.1
+endif
 # === END USER OPTIONS ===
 
 ### DNS
