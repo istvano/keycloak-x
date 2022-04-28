@@ -1,4 +1,4 @@
-FROM quay.io/keycloak/keycloak:17.0.1 as builder
+FROM quay.io/keycloak/keycloak:18.0.0 as builder
 
 ARG KC_METRICS_ENABLED=false
 ARG KC_FEATURES=
