@@ -109,16 +109,29 @@ env ?= .env
 include $(env)
 export $(shell sed 's/=.*//' $(env))
 
+USERNAME=$(shell whoami)
+UID=$(shell id -u ${USERNAME})
+GID=$(shell id -g ${USERNAME})
+
 MFILECWD = $(shell pwd)
 ETC=$(MFILECWD)/etc
 TLS=$(ETC)/tls
 
+CRT_FILENAME=tls.pem
+KEY_FILENAME=tls.key
+DOCKER_BUILD_ARGS=--build-arg KC_FEATURES="$(KC_FEATURES)" --build-arg KC_DB=$(KC_DB)
+
+KC_ADM_CON=--no-config --server http://localhost:8080 --user admin --password admin --realm master
+KC_ADM=/opt/keycloak/bin/kcadm.sh
+KC_REALM=quickstart
+KC_PUBLIC_CLIENT=test-public-client
+KC_INTERNAL_CLIENT=test-bearer-internal-client-1
 
 #space separated string array ->
 $(eval $(call defw,NAMESPACES,keycloak-test))
 $(eval $(call defw,DEFAULT_NAMESPACE,$(shell echo $(NAMESPACES) | awk '{print $$1}')))
 $(eval $(call defw,ENV,$(ENV)))
-$(eval $(call defw,DOMAINS,"www.keycloak.lan"))
+$(eval $(call defw,DOMAINS,keycloak.lan *.keycloak.lan example.test *.example.test))
 $(eval $(call defw,TLS_PORT,8443))
 $(eval $(call defw,CLUSTER_NAME,$(shell basename $(MFILECWD))))
 $(eval $(call defw,IP_ADDRESS,$(IP_ADDRESS)))
@@ -162,18 +175,43 @@ dns/remove: ##@dns Delete dns entries
 .PHONY: tls/create-cert
 tls/create-cert:  ##@tls Create self sign certs for local machine
 	@echo "Creating self signed certificate"
-	(cd $(TLS) && ./self-signed-cert.sh)
+	docker run -it --user $(UID):$(UID) \
+		--mount "type=bind,src=$(TLS),dst=/home/mkcert" \
+		--mount "type=bind,src=$(TLS),dst=/root/.local/share/mkcert" \
+		istvano/mkcert:latest -install
+	docker run -it --user $(UID):$(UID) \
+		--mount "type=bind,src=$(TLS),dst=/home/mkcert" \
+		--mount "type=bind,src=$(TLS),dst=/root/.local/share/mkcert" \
+		istvano/mkcert:latest -cert-file $(CRT_FILENAME) -key-file $(KEY_FILENAME) $(DOMAINS) localhost 127.0.0.1 ::1
 
+
+.PHONY: delete-from-store
+tls/delete-from-store:
+	@[ -d ~/.pki/nssdb ] || mkdir -p ~/.pki/nssdb
+	@(if [ -z $(shell certutil -d sql:$$HOME/.pki/nssdb -L | grep '$(MAIN_DOMAIN) cert authority' | head -n1 | awk '{print $$1;}') ]; \
+	then \
+		echo "not exists. skipping delete"; \
+	else \
+		certutil -d sql:$$HOME/.pki/nssdb -D -n '$(MAIN_DOMAIN) cert authority'; \
+		echo "deleted"; \
+	fi)
+	@(if [ -z $(shell certutil -d sql:$$HOME/.pki/nssdb -L | grep '$(MAIN_DOMAIN)' | head -n1 | awk '{print $$1;}') ]; \
+	then \
+		echo "not exists. skipping delete"; \
+	else \
+		certutil -d sql:$$HOME/.pki/nssdb -D -n '$(MAIN_DOMAIN)'; \
+		echo "deleted"; \
+	fi)
 
 .PHONY: tls/trust-cert
-tls/trust-cert: ##@tls Trust self signed cert by local browser
+tls/trust-cert: tls/delete-from-store ##@tls Trust self signed cert by local browser
 	@echo "Import self signed cert into user's truststore"
 ifeq ($(UNAME_S),Darwin)
-	sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain $(TLS)/tls-ca/keycloak.lan_ca.crt
+	sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain $(TLS)/.local/share/mkcert/rootCA.pem
 else
 	@[ -d ~/.pki/nssdb ] || mkdir -p ~/.pki/nssdb
-	@certutil -d sql:$$HOME/.pki/nssdb -A -n '$(MAIN_DOMAIN) cert authority' -i $(TLS)/tls-ca/keycloak.lan_ca.crt -t TCP,TCP,TCP
-	@certutil -d sql:$$HOME/.pki/nssdb -A -n '$(MAIN_DOMAIN)' -i $(TLS)/tls-ca/keycloak.lan.crt -t P,P,P
+	@certutil -d sql:$$HOME/.pki/nssdb -A -n '$(MAIN_DOMAIN) cert authority' -i $(TLS)/.local/share/mkcert/rootCA.pem -t TCP,TCP,TCP
+	@certutil -d sql:$$HOME/.pki/nssdb -A -n '$(MAIN_DOMAIN)' -i $(TLS)/tls.pem -t P,P,P
 endif
 	@echo "Import successful..."
 
@@ -199,11 +237,11 @@ network/delete: ##@Docker create network
 
 .PHONY: build
 build:  ##@Docker build docker image
-	$(DOCKER) build . -t $(APP)
+	$(DOCKER) build . -t $(APP) $(DOCKER_BUILD_ARGS)
 
 .PHONY: build-nc
 build-nc:  ##@Docker build docker image without using cache
-	$(DOCKER) build . -t $(APP)
+	$(DOCKER) build . -t $(APP) $(DOCKER_BUILD_ARGS)
 
 .PHONY: tag
 tag: tag-latest tag-version ##@Docker Generate container tags for the `{version}` ans `latest` tags
@@ -240,7 +278,7 @@ theme/build: ##@dev Start docker container
 		--mount type=bind,source=$(MFILECWD)/themes,target=/usr/local/src \
 		--mount type=bind,source=$(MFILECWD)/etc/tmp/m2,target=/root/.m2 \
 		--workdir="/usr/local/src" \
-		$(MAVEN-IMAGE) \
+		$(MAVEN_IMAGE) \
 		mvn package
 
 ### DEVELOPMENT
@@ -249,20 +287,26 @@ theme/build: ##@dev Start docker container
 run: ##@dev Start docker container
 	$(DOCKER) run -i -t --rm \
 		--env-file=./.env \
+		-e KC_DB=dev-file \
+		-e KC_CACHE=local \
+		-e KC_LOG_CONSOLE_COLOR=true \
+		-e KC_HTTPS_CERTIFICATE_FILE=/etc/ssl/certs/keycloak/tls.pem \
+		-e KC_HTTPS_CERTIFICATE_KEY_FILE=/etc/ssl/certs/keycloak/tls.key \
+		-e KC_SPI_LOGIN_PROTOCOL_OPENID_CONNECT_LEGACY_LOGOUT_REDIRECT_URI=true \
+		-e KC_SPI_LOGIN_PROTOCOL_OPENID_CONNECT_SUPPRESS_LOGOUT_CONFIRMATION_SCREEN=true \
 		--network $(ENV)_sso \
 		--name="$(APP)" \
-		--mount type=bind,source=$(MFILECWD)/etc/tls/tls-ca,target=/etc/ssl/certs/keycloak \
+		--mount type=bind,source=$(MFILECWD)/etc/tls,target=/etc/ssl/certs/keycloak \
 		--mount type=bind,source=$(MFILECWD)/etc/data,target=/opt/keycloak/data \
 		--mount type=bind,source=$(MFILECWD)/themes/src/main/resources/themes,target=/opt/keycloak/themes \
-		-e KC_DB=dev-file \
 		-p 8080:8080 \
 		-p $(TLS_PORT):8443 \
 		-p 8787:8787 \
-		$(BASE-IMAGE) \
-		start-dev --features=preview
+		$(APP):latest \
+		start-dev --features=token-exchange,admin-fine-grained-authz,declarative-user-profile
 
-.PHONY: kc/migrate
-kc/migrate: ##@dev Run migrations
+.PHONY: realm/migrate
+realm/migrate: ##@realm Run migrations
 	$(DOCKER) run \
 	--network $(ENV)_sso \
 	-e KEYCLOAK_URL=https://keycloak:8443/ \
@@ -271,11 +315,66 @@ kc/migrate: ##@dev Run migrations
 	-e KEYCLOAK_SSLVERIFY=false \
 	-e WAIT_TIME_IN_SECONDS=120 \
 	-e SPRING_PROFILES_INCLUDE=debug \
+	-e IMPORT_VARSUBSTITUTION_ENABLED=true \
 	-e IMPORT_PATH=/config \
 	-e IMPORT_FORCE=false \
+	-e REALM_NAME=quickstart \
+	-e TEST_CLIENT_SECRET=secret \
+	-e TEST_USER_CRED=password \
+	-e LOCAL_ADMIN_CRED=password \
 	--mount type=bind,source="$$(pwd)"/etc/conf/keycloak,target=/config \
-	adorsys/keycloak-config-cli:$(KEYCLOAK-MIGRATE)
+	$(KEYCLOAK_MIGRATE)
 
+### Token exchange
+
+.PHONY: te/enable-permissions
+te/enable-permissions: ##@token Enable token exchange for a client
+	@(CLIENT_ID=`$(DOCKER) exec -it $(APP) $(KC_ADM) get clients -r $(KC_REALM) --fields id,clientId $(KC_ADM_CON) | sed 1d | jq '.[] | select(.clientId==("'$(KC_INTERNAL_CLIENT)'")) | .id' | sed 's/\"//g'` \
+		&& $(DOCKER) exec -it $(APP) $(KC_ADM) update clients/$$CLIENT_ID/management/permissions -r "$(KC_REALM)" -s enabled=true $(KC_ADM_CON) \
+		)
+
+.PHONY: te/add-policy
+te/add-policy: ##@token Add token exchange client policy
+	@(CLIENT_ID=`$(DOCKER) exec -it $(APP) $(KC_ADM) get clients -r $(KC_REALM) --fields id,clientId $(KC_ADM_CON) | sed 1d | jq '.[] | select(.clientId==("'$(KC_PUBLIC_CLIENT)'")) | .id' | sed 's/\"//g'` \
+		&& MAN_CLIENT_ID=`$(DOCKER) exec -it $(APP) $(KC_ADM) get clients -r $(KC_REALM) --fields id,clientId $(KC_ADM_CON) | sed 1d | jq '.[] | select(.clientId==("'realm-management'")) | .id' | sed 's/\"//g'` \
+		&& echo { \
+				\"id\": \"a18a9428-261b-465d-a771-9a23a108cc92\", \
+				\"name\": \"token_exchange_policy\", \
+				\"type\": \"client\", \
+				\"logic\": \"POSITIVE\", \
+				\"decisionStrategy\": \"UNANIMOUS\", \
+				\"config\": { \"clients\": \"[\\\"$$CLIENT_ID\\\"]\"} \
+			} \
+			| $(DOCKER) exec -i $(APP) $(KC_ADM) create clients/$$MAN_CLIENT_ID/authz/resource-server/policy -r "$(KC_REALM)" $(KC_ADM_CON) -f - \
+		)
+
+.PHONY: te/add-permission
+te/add-permission: ##@token Add token exchange client policy
+	@(INT_CLIENT_ID=`$(DOCKER) exec -it $(APP) $(KC_ADM) get clients -r $(KC_REALM) --fields id,clientId $(KC_ADM_CON) | sed 1d | jq '.[] | select(.clientId==("'$(KC_INTERNAL_CLIENT)'")) | .id' | sed 's/\"//g'` \
+		MAN_CLIENT_ID=`$(DOCKER) exec -it $(APP) $(KC_ADM) get clients -r $(KC_REALM) --fields id,clientId $(KC_ADM_CON) | sed 1d | jq '.[] | select(.clientId==("'realm-management'")) | .id' | sed 's/\"//g'` \
+		&& TOKEN_EXCHANGE_SCOPE_ID=`$(DOCKER) exec -it $(APP) $(KC_ADM) get clients/$$MAN_CLIENT_ID/authz/resource-server/scope -r "$(KC_REALM)" $(KC_ADM_CON) | sed 1d |  jq -r '.[] | select(.name==("token-exchange")) | .id'` \
+		&& EXCHANGE_POLICY_ID=`$(DOCKER) exec -it $(APP) $(KC_ADM) get clients/$$MAN_CLIENT_ID/authz/resource-server/policy -r "$(KC_REALM)" $(KC_ADM_CON) | sed 1d | jq -r '.[] | select(.name=="token_exchange_policy") | .id'` \
+		&& TOKEN_EXCHANGE_PERMISSION_POLICY_ID=`$(DOCKER) exec -it $(APP) $(KC_ADM) get clients/$$MAN_CLIENT_ID/authz/resource-server/policy -r "$(KC_REALM)" $(KC_ADM_CON) | sed 1d | jq -r '.[] | select(.name | startswith("token-exchange.permission.client.'$$INT_CLIENT_ID'")) | .id'` \
+		&& CLIENT_RESOURCE_ID=`$(DOCKER) exec -it $(APP) $(KC_ADM) get clients/$$MAN_CLIENT_ID/authz/resource-server/resource -r "$(KC_REALM)" $(KC_ADM_CON) | sed 1d | jq -r '.[] | select(.name | startswith("client.resource.'$$INT_CLIENT_ID'")) | ._id'` \
+		&& $(DOCKER) exec -i $(APP) $(KC_ADM) update clients/$$MAN_CLIENT_ID/authz/resource-server/permission/scope/$$TOKEN_EXCHANGE_PERMISSION_POLICY_ID -r "$(KC_REALM)" $(KC_ADM_CON) \
+			-s 'scopes=["'$$TOKEN_EXCHANGE_SCOPE_ID'"]' \
+			-s 'resources=["'$$CLIENT_RESOURCE_ID'"]' \
+			-s 'policies=["'$$EXCHANGE_POLICY_ID'"]' \
+		)
+
+.PHONY: te/test
+te/test: ##@token Test by exchanging tokens
+	@(curl -X POST -H "Content-Type: application/x-www-form-urlencoded" \
+			--data 'grant_type=password&client_id=$(KC_PUBLIC_CLIENT)&username=ecila&password=password' \
+			http://localhost:8080/realms/$(KC_REALM)/protocol/openid-connect/token \
+	)
+
+
+.PHONY: realm/delete
+realm/delete: ##@realm Delete realm
+	@($(DOCKER) exec -it $(APP) $(KC_ADM) \
+		delete realms/$(KC_REALM) $(KC_ADM_CON) \
+	)
 
 ### MISC
 

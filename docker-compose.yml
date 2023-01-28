@@ -10,11 +10,12 @@ volumes:
 services:
 
   keycloak:
-    build: 
+    build:
       context: .
       args:
         - KC_FEATURES
         - KC_METRICS_ENABLED
+    image: keycloak:latest
     environment:
       - KC_DB_URL=jdbc:postgresql://postgres:5432/${POSTGRES_DB}?ssl=allow
       - KC_DB_USERNAME=${POSTGRES_NON_ROOT_USER}

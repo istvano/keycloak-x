@@ -1,0 +1,29 @@
+{
+  "enabled": true,
+  "realm": "$(env:REALM_NAME)",
+  "scopeMappings": [
+    {
+      "client": "test-public-client",
+      "roles": [
+        "user"
+      ]
+    },
+    {
+      "clientScope": "offline_access",
+      "roles": [
+        "offline_access"
+      ]
+    }
+  ],
+  "clientScopeMappings": {
+    "account": [
+      {
+        "client": "account-console",
+        "roles": [
+          "manage-account",
+          "view-groups"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "enabled": true,
+  "realm": "$(env:REALM_NAME)",
+  "users": [
+    {
+      "username": "ecila",
+      "enabled": true,
+      "email": "alice@test.org",
+      "firstName": "Ecila",
+      "lastName": "In Pain",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "$(env:TEST_USER_CRED)"
+        }
+      ],
+      "realmRoles": [
+        "user"
+      ],
+      "clientRoles": {
+        "account": [
+          "manage-account"
+        ]
+      }
+    },
+    {
+      "username": "localadmin",
+      "enabled": true,
+      "email": "admin@test.org",
+      "firstName": "Admin",
+      "lastName": "Master",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "$(env:LOCAL_ADMIN_CRED)"
+        }
+      ],
+      "realmRoles": [
+        "admin"
+      ],
+      "clientRoles": {
+        "realm-management": [
+          "realm-admin"
+        ],
+        "account": [
+          "manage-account"
+        ]
+      }
+    }]
+}

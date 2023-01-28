@@ -1,4 +1,4 @@
 {
   "enabled": true,
-  "realm": "quickstart"
+  "realm": "$(env:REALM_NAME)"
 }

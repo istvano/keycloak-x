@@ -1,6 +1,6 @@
 {
   "enabled": true,
-  "realm": "quickstart",
+  "realm": "$(env:REALM_NAME)",
   "bruteForceProtected": true,
   "permanentLockout": false,
   "maxFailureWaitSeconds": 900,

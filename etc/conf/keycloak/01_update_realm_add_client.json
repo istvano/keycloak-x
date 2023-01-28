@@ -1,6 +1,6 @@
 {
   "enabled": true,
-  "realm": "quickstart",
+  "realm": "$(env:REALM_NAME)",
   "clients": [
     {
       "clientId": "test-public-client",
@@ -11,9 +11,10 @@
       "consentRequired": false,
       "standardFlowEnabled": true,
       "implicitFlowEnabled": false,
-      "directAccessGrantsEnabled": false,
+      "directAccessGrantsEnabled": true,
       "serviceAccountsEnabled": false,
       "publicClient": true,
+      "fullScopeAllowed": false,
       "redirectUris": [
         "*"
       ],
@@ -31,10 +32,10 @@
       "standardFlowEnabled": true,
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
-      "serviceAccountsEnabled": false,
+      "serviceAccountsEnabled": true,
       "publicClient": false,
       "clientAuthenticatorType": "client-secret",
-      "secret": "secret",
+      "secret": "$(env:TEST_CLIENT_SECRET)",
       "redirectUris": [
         "*"
       ],
@@ -46,6 +47,33 @@
       "clientId": "test-bearer-client",
       "name": "test-bearer-client",
       "description": "Bearer Only Test Client",
+      "enabled": true,
+      "bearerOnly": true,
+      "consentRequired": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "publicClient": false
+    },
+    {
+      "id": "3a4b4e2c-850b-400e-b894-0da763ba081a",
+      "clientId": "test-bearer-internal-client-1",
+      "name": "test-bearer-internal-client1",
+      "description": "Bearer Only Internal Test Client 1",
+      "enabled": true,
+      "bearerOnly": true,
+      "consentRequired": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "publicClient": false
+    },
+    {
+      "clientId": "test-bearer-internal-client-2",
+      "name": "test-bearer-internal-client2",
+      "description": "Bearer Only Internal Test Client 2",
       "enabled": true,
       "bearerOnly": true,
       "consentRequired": false,

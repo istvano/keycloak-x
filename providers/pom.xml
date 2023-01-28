@@ -4,8 +4,8 @@
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.example.keycloak</groupId>
-	<artifactId>themes</artifactId>
+	<artifactId>provider</artifactId>
 	<version>20.0.3-SNAPSHOT</version>
-	<name>Example Keycloak Themes</name>
+	<name>Example Keycloak Providers</name>
 	<description />
 </project>
