@@ -362,13 +362,26 @@ te/add-permission: ##@token Add token exchange client policy
 			-s 'policies=["'$$EXCHANGE_POLICY_ID'"]' \
 		)
 
-.PHONY: te/test
-te/test: ##@token Test by exchanging tokens
-	@(curl -X POST -H "Content-Type: application/x-www-form-urlencoded" \
-			--data 'grant_type=password&client_id=$(KC_PUBLIC_CLIENT)&username=ecila&password=password' \
-			http://localhost:8080/realms/$(KC_REALM)/protocol/openid-connect/token \
-	)
+.PHONY: te/setup
+te/setup: te/enable-permissions te/add-policy te/add-permission ##@token Set up token exchange
 
+.PHONY: te/exchange
+te/exchange: ##@token Test by exchanging tokens
+	@(TOKEN=`curl -X POST --header "Content-Type: application/x-www-form-urlencoded" \
+			--data 'grant_type=password' \
+			--data 'client_id=$(KC_PUBLIC_CLIENT)' \
+			--data 'username=ecila' --data 'password=password' \
+			http://localhost:8080/realms/$(KC_REALM)/protocol/openid-connect/token \
+			| jq -r '.access_token'` \
+			&& curl -sS --request POST --url http://localhost:8080/realms/$(KC_REALM)/protocol/openid-connect/token \
+          --header 'Content-Type: application/x-www-form-urlencoded' \
+          --data "client_id=$(KC_PUBLIC_CLIENT)" \
+          --data "subject_token=$$TOKEN" \
+          --data "audience=$(KC_INTERNAL_CLIENT)" \
+          --data-urlencode "grant_type=urn:ietf:params:oauth:grant-type:token-exchange" \
+          --data-urlencode "requested_token_type=urn:ietf:params:oauth:token-type:refresh_token" \
+          | jq . \
+	)
 
 .PHONY: realm/delete
 realm/delete: ##@realm Delete realm
